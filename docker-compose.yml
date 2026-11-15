@@ -1,0 +1,12 @@
+services:
+  meter-reader:
+    image: ghcr.io/slavmak/meter-reader:latest  # `docker compose pull` takes the published image
+    build: .                                    # `docker compose up --build` builds it locally
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data               # config.json (incl. MQTT settings), state.json, last snapshots
+    environment:
+      UI_PASSWORD: ""              # set a password to protect the web UI
+      TZ: Asia/Almaty

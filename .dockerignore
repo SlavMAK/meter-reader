@@ -1,0 +1,6 @@
+*
+!Dockerfile
+!LICENSE-AI-on-the-edge.md
+!reader/
+reader/__pycache__/
+reader/test_recognize.py

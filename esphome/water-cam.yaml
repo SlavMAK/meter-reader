@@ -1,0 +1,114 @@
+# ESP32-CAM (AI-Thinker) as a camera for meter-reader.
+# One file per meter: copy it, change `name`, flash via ESPHome (USB the first time, then OTA).
+substitutions:
+  name: water-cam-cold
+  friendly_name: Камера холодной воды
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  on_boot:
+    priority: -100
+    then:
+      - light.turn_on:
+          id: status_light
+          effect: Пульс
+
+esp32:
+  board: esp32cam
+  framework:
+    type: esp-idf
+
+psram:
+
+logger:
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+  reboot_timeout: 0s  # meter-reader talks HTTP; don't reboot every 15 min when HA isn't connected
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    password: !secret ap_password
+
+captive_portal:
+
+# REST API: meter-reader turns the flash on/off via POST /light/Flash/turn_on|turn_off
+web_server:
+  port: 80
+
+# meter-reader takes snapshots from http://<ip>:8081/
+esp32_camera_web_server:
+  - port: 8081
+    mode: snapshot
+
+esp32_camera:
+  name: Камера
+  external_clock:
+    pin: GPIO0
+    frequency: 20MHz
+  i2c_pins:
+    sda: GPIO26
+    scl: GPIO27
+  data_pins: [GPIO5, GPIO18, GPIO19, GPIO21, GPIO36, GPIO39, GPIO34, GPIO35]
+  vsync_pin: GPIO25
+  href_pin: GPIO23
+  pixel_clock_pin: GPIO22
+  power_down_pin: GPIO32
+  resolution: 640x480  # AI-on-the-edge default; half the bytes of 800x600 for a weak Wi-Fi link
+  jpeg_quality: 10
+  idle_framerate: 0.1fps
+  # Tune these if the picture is too dark/bright under the flash
+  brightness: 0
+  contrast: 0
+
+output:
+  - platform: ledc
+    id: flash_out
+    pin: GPIO4
+    channel: 2         # camera uses PWM timer 1, see ESPHome esp32_camera docs
+    frequency: 20000Hz # high PWM frequency against stripes in the photo
+
+light:
+  # Red LED on the back (GPIO33): short pulse every 3 s = all OK,
+  # fast/regular blinking = connecting to Wi-Fi or an error, steady on/off = no power or hung
+  - platform: status_led
+    id: status_light
+    name: Статус
+    pin:
+      number: GPIO33
+      inverted: true
+    restore_mode: ALWAYS_ON
+    effects:
+      - strobe:
+          name: Пульс
+          colors:
+            - state: true
+              duration: 100ms
+            - state: false
+              duration: 2900ms
+
+  - platform: monochromatic
+    id: flash
+    name: Flash         # meter-reader expects exactly this name
+    output: flash_out
+    restore_mode: ALWAYS_OFF
+    default_transition_length: 0s
+    gamma_correct: 1
+    on_turn_on:
+      - script.execute: flash_watchdog
+
+script:
+  # The flash LED heats up quickly: switch it off even if meter-reader never sends turn_off
+  - id: flash_watchdog
+    mode: restart
+    then:
+      - delay: 15s
+      - light.turn_off: flash

@@ -1,0 +1,6 @@
+# secrets and runtime data: MQTT password in data/config.json, Wi-Fi/OTA/API keys in secrets.yaml
+data/
+secrets.yaml
+.esphome/
+.claude/
+__pycache__/

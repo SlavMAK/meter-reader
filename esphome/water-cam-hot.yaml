@@ -1,0 +1,7 @@
+# Hot water camera: everything comes from water-cam.yaml, only the name differs.
+substitutions:
+  name: water-cam-hot
+  friendly_name: Камера горячей воды
+
+packages:
+  base: !include water-cam.yaml
